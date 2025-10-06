@@ -1,12 +1,14 @@
 import ollama
 from commands.weather_forecast import weather_forecast
 import datetime
+from fastapi import WebSocket
+
 
 # Functie om modeloutput te verwerken
 def execute_model_output(model_output: str) -> str:
     return weather_forecast(model_output)    
 
-def ai(user_input:str):
+async def ai(user_input:str, websocket:WebSocket):
     message_content = user_input
     if user_input == "bye bye":
       return
@@ -20,12 +22,11 @@ def ai(user_input:str):
              hoi = True
           elif len(full_response) > 1 and not hoi:
             if i == 0:
-              print(full_response, end='')
+              websocket.send_text(full_response, end='')
               i += 1
-            print(part['message']['content'], end='', flush=True)
+            websocket.send_text(part['message']['content'], end='', flush=True)
           full_response += part['message']['content']
         if hoi:
-          
            return ai(execute_model_output(full_response))
 
              

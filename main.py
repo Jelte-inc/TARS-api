@@ -21,7 +21,7 @@ async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     while True:
         data = await websocket.receive_text()
-        print(f"Ontvangen bericht: {data}")
+        ai(data, websocket)
 
         # Simuleer een antwoord dat per letter wordt gestuurd
         response = "Dit is een simulatie van het antwoord."
