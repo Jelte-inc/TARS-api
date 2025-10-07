@@ -21,17 +21,7 @@ async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     while True:
         data = await websocket.receive_text()
-        ai(data, websocket)
-
-        # Simuleer een antwoord dat per letter wordt gestuurd
-        response = "Dit is een simulatie van het antwoord."
-
-        for letter in response:
-            await websocket.send_text(letter)
-            await asyncio.sleep(0.1)  # delay per letter
-
-        # Optioneel: sluiten of wachten op client disconnect
-        await websocket.close()
+        await ai(data, websocket)
 
 
 if __name__ == "__main__":

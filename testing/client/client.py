@@ -11,7 +11,7 @@ async def listen():
 
         while True:
             try:
-                letter = await asyncio.wait_for(websocket.recv(), timeout=2)
+                letter = await asyncio.wait_for(websocket.recv(), timeout=1000)
                 print(f"Ontvangen letter: {letter}")
             except asyncio.TimeoutError:
                 print("Geen data meer ontvangen, connection close assumed.")
