@@ -22,12 +22,12 @@ async def ai(user_input:str, websocket:WebSocket):
              hoi = True
           elif len(full_response) > 1 and not hoi:
             if i == 0:
-              await websocket.send_text(full_response, end='')
+              await websocket.send_text(full_response)
               i += 1
-            await websocket.send_text(part['message']['content'], end='', flush=True)
+            await websocket.send_text(part['message']['content'])
           full_response += part['message']['content']
         if hoi:
-           return ai(execute_model_output(full_response))
+          await ai(execute_model_output(full_response), websocket)
 
              
     except Exception as e:
