@@ -3,8 +3,17 @@ from ai.ai_chat_model import ai
 from fastapi import FastAPI, WebSocket
 from pydantic import BaseModel
 import asyncio
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # of specifiek: ["http://localhost"]
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Voorbeeld input-model
 class InputData(BaseModel):
