@@ -13,7 +13,7 @@ def weather_forecast(user_input:str):
     if key is None:
         print("Api key is missing")
     print(user_input)
-    parts = user_input[1:].strip().split(maxsplit=1)  # haal '@' weg en splits
+    parts = user_input[1:].strip().split(maxsplit=1)
     if len(parts) == 2:
         days, location = parts
         print("Day:", days)

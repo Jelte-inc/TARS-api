@@ -1,5 +1,5 @@
 # --- Base model ---
-FROM llama3.2:3b
+FROM gemma3:12b
 
 PARAMETER temperature 0.4
 PARAMETER top_p 0.9

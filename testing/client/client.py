@@ -5,7 +5,7 @@ async def listen():
     uri = "ws://192.168.122.1:56277/ws"
     async with websockets.connect(uri) as websocket:
         # Stuur 1 keer bericht
-        await websocket.send("Hallo FastAPI websocket!")
+        await websocket.send("What is the weather in Amsterdam")
 
         print("Bericht verzonden, wacht op reactie...")
 

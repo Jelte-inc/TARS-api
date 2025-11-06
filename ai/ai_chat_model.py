@@ -34,5 +34,4 @@ async def ai(user_input:str, websocket:WebSocket):
              
     except Exception as e:
         print("Something went wrong:", e)
-    print()
-    return full_response
+    print(full_response)
