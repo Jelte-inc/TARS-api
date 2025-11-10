@@ -8,7 +8,7 @@ import (
 	"github.com/liliang-cn/ollama-go"
 )
 
-func Ai(userInput string) {
+func AiModel(userInput string) {
 	ctx := context.Background()
 	if userInput == "bye bye" {
 		return

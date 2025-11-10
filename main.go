@@ -25,6 +25,8 @@ func handleWS(w http.ResponseWriter, r *http.Request) {
 		}
 		fmt.Println("Ontvangen:", string(msg))
 
+		ai.AiModel(string(msg))
+
 		// stuur het terug (echo)
 		conn.WriteMessage(websocket.TextMessage, msg)
 	}
@@ -33,6 +35,5 @@ func handleWS(w http.ResponseWriter, r *http.Request) {
 func main() {
 	http.HandleFunc("/ws", handleWS)
 	fmt.Println("WebSocket-server draait op ws://localhost:8080/ws")
-	ai.Ai("hoi")
 	http.ListenAndServe(":8080", nil)
 }
