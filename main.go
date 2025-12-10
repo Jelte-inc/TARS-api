@@ -1,38 +1,207 @@
 package main
 
 import (
+	"bufio"
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"io"
+	"log"
 	"net/http"
+	"os"
+	"os/exec"
+	"regexp"
+	"strings"
+	"sync"
 
-	"tars-api/ai"
-
+	"example.com/m/ai"
 	"github.com/gorilla/websocket"
 )
 
+// WebSocket upgrader
 var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool { return true }, // laat alle origins toe
+	CheckOrigin: func(r *http.Request) bool { return true },
 }
 
-func handleWS(w http.ResponseWriter, r *http.Request) {
-	conn, _ := upgrader.Upgrade(w, r, nil) // upgrade HTTP -> WS
+// AudioBuffer houdt audio op tot volledig bestand
+type AudioBuffer struct {
+	mu    sync.Mutex
+	audio []byte
+	done  bool
+}
+
+func (b *AudioBuffer) Append(chunk []byte) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.audio = append(b.audio, chunk...)
+}
+
+func (b *AudioBuffer) Get() []byte {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.audio
+}
+
+func (b *AudioBuffer) SetDone() {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.done = true
+}
+
+func (b *AudioBuffer) IsDone() bool {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.done
+}
+
+// WebSocket handler
+func wsHandler(w http.ResponseWriter, r *http.Request) {
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Println("Upgrade error:", err)
+		return
+	}
 	defer conn.Close()
 
+	buffer := &AudioBuffer{}
+
 	for {
-		// lees bericht van client
-		_, msg, err := conn.ReadMessage()
+		msgType, data, err := conn.ReadMessage()
 		if err != nil {
+			log.Println("ReadMessage error:", err)
 			break
 		}
-		fmt.Println("Ontvangen:", string(msg))
 
-		// stuur het terug (echo)
-		conn.WriteMessage(websocket.TextMessage, msg)
+		if msgType == websocket.BinaryMessage {
+			// audio chunk ontvangen
+			buffer.Append(data)
+		} else if msgType == websocket.TextMessage {
+			text := string(data)
+			if text == "end" {
+				// hele audiofragment ontvangen
+				buffer.SetDone()
+				log.Println("Full audio received, processing...")
+
+				go processAudio(buffer, conn)
+			}
+		}
 	}
+
 }
 
+func splitIntoSentences(text string) []string {
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return nil
+	}
+
+	// Regex: splits op ., !, ? gevolgd door spatie of einde
+	re := regexp.MustCompile(`(?m)([^.!?]+[.!?]?)`)
+	matches := re.FindAllString(text, -1)
+
+	var sentences []string
+	for _, s := range matches {
+		s = strings.TrimSpace(s)
+		if s != "" {
+			sentences = append(sentences, s)
+		}
+	}
+
+	// fallback: hele tekst als 1 zin
+	if len(sentences) == 0 {
+		sentences = append(sentences, text)
+	}
+
+	return sentences
+}
+
+// Simpele mock STT + AI pipeline
+func processAudio(buffer *AudioBuffer, conn *websocket.Conn) {
+	audio := buffer.Get()
+
+	filename := "received_audio.wav"
+	err := os.WriteFile(filename, audio, 0644)
+	if err != nil {
+		log.Println("Fout bij opslaan bestand:", err)
+		return
+	}
+	log.Println("Audio opgeslagen als", filename)
+
+	// Hier zou je STT aanroepen (bijv. Whisper of Vosk)
+	fmt.Fprintln(stdin, filename)
+	out := ""
+	if scanner.Scan() {
+		out = scanner.Text()
+	}
+	log.Print(string(out))
+	// AI vertaling / verwerking
+	aiOutput := ai.Ai(string(out))
+	print(aiOutput)
+	sentences := splitIntoSentences(aiOutput)
+	fmt.Print(sentences)
+	for _, s := range sentences {
+		sentence := map[string]string{
+			"sentence": s,
+		}
+		data, err := json.Marshal(sentence)
+		if err != nil {
+			log.Fatal("Error encoding JSON:", err)
+		}
+		resp, err := http.Post("http://localhost:8000/tts", "application/json", bytes.NewBuffer(data))
+		if err != nil {
+			log.Fatal("Error sending POST request:", err)
+		}
+		audioData, err := io.ReadAll(resp.Body) // haal hele WAV in één keer op
+		resp.Body.Close()
+		if err != nil {
+			log.Fatal(err)
+		}
+		if len(audioData) == 0 {
+			log.Println("Waarschuwing: lege audio ontvangen van TTS")
+			return
+		}
+
+		// Stuur alles in één WebSocket bericht
+		if err := conn.WriteMessage(websocket.BinaryMessage, audioData); err != nil {
+			log.Println("WebSocket write error:", err)
+		}
+
+		// Stuur einde van zin
+		if err := conn.WriteMessage(websocket.TextMessage, []byte("end")); err != nil {
+			log.Println("WebSocket write error:", err)
+		}
+
+		// Stuur een korte tekstmelding om einde van zin aan te geven
+		if err := conn.WriteMessage(websocket.TextMessage, []byte("end")); err != nil {
+			log.Println("WriteMessage error:", err)
+			break
+		}
+	}
+
+}
+
+// Mock AI functie
+func mockAI(transcript string) string {
+	// Verwerk transcriptie (hier dummy)
+	return fmt.Sprintf("AI output: %s", transcript)
+}
+
+var stdin io.WriteCloser
+var scanner *bufio.Scanner
+
 func main() {
-	http.HandleFunc("/ws", handleWS)
-	fmt.Println("WebSocket-server draait op ws://localhost:8080/ws")
-	ai.Ai("hoi")
-	http.ListenAndServe(":8080", nil)
+	cmd := exec.Command("C:\\Users\\0jrli\\AppData\\Local\\Programs\\Python\\Python312\\python.exe", "test.py")
+	stdin, _ = cmd.StdinPipe()
+	stdout, _ := cmd.StdoutPipe()
+	cmd.Stderr = os.Stderr
+	if err := cmd.Start(); err != nil {
+		log.Fatal(err)
+	}
+	scanner = bufio.NewScanner(stdout)
+	scanner.Scan()
+	fmt.Println(scanner.Text()) // READY
+
+	http.HandleFunc("/ws", wsHandler)
+	log.Println("Server gestart op :8080")
+	log.Fatal(http.ListenAndServe(":56277", nil))
 }

@@ -2,36 +2,19 @@ package ai
 
 import (
 	"context"
-	"fmt"
-	"log"
 
 	"github.com/liliang-cn/ollama-go"
 )
 
-func Ai(userInput string) {
+func Ai(message string) string {
 	ctx := context.Background()
-	if userInput == "bye bye" {
-		return
-	}
-	model := "tars"
-
 	messages := []ollama.Message{
-		{Role: "user", Content: userInput},
+		{Role: "user", Content: message},
 	}
-	responseChan, errChan := ollama.ChatStream(ctx, model, messages)
+	response, err := ollama.Chat(ctx, "tars", messages)
+	if err != nil {
 
-	for {
-		select {
-		case resp, ok := <-responseChan:
-			if !ok {
-				return
-			}
-			fmt.Print(resp.Message.Content)
-		case err := <-errChan:
-			if err != nil {
-				log.Fatal("Error tijdens stream:", err)
-			}
-			return
-		}
 	}
+	return response.Message.Content
+
 }
