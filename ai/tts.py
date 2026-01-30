@@ -6,6 +6,10 @@ import soundfile as sf
 import io
 from TTS.api import TTS
 from scipy.signal import resample, butter, lfilter
+import whisper
+import os
+model = whisper.load_model("base")
+print("READY")  # laat Go weten dat het model geladen is
 
 # ---- Model laden ----
 tts = TTS("tts_models/en/ljspeech/tacotron2-DDC", gpu=True)
@@ -17,6 +21,8 @@ app = FastAPI(title="TARS TTS API")
 # ---- Pydantic request model ----
 class TTSRequest(BaseModel):
     sentence: str
+class STTRequest(BaseModel):
+    audio_path: str
 
 # ---- Audio effect functies ----
 def highpass_filter(wav, sr, cutoff=3000):
@@ -54,3 +60,8 @@ def tts_endpoint(request: TTSRequest):
     buf.seek(0)
 
     return StreamingResponse(buf, media_type="audio/wav")
+@app.get("/stt")
+def stt_endpoint():
+    file_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "received_audio.wav"))
+    result = model.transcribe(file_path)
+    return result["text"]

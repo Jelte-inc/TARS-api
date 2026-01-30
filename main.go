@@ -9,7 +9,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"os/exec"
 	"regexp"
 	"strings"
 	"sync"
@@ -117,6 +116,10 @@ func splitIntoSentences(text string) []string {
 
 // Simpele mock STT + AI pipeline
 func processAudio(buffer *AudioBuffer, conn *websocket.Conn) {
+	if !buffer.IsDone() {
+		log.Println("Buffer nog niet klaar")
+		return
+	}
 	audio := buffer.Get()
 
 	filename := "received_audio.wav"
@@ -126,16 +129,12 @@ func processAudio(buffer *AudioBuffer, conn *websocket.Conn) {
 		return
 	}
 	log.Println("Audio opgeslagen als", filename)
-
+	resp, err := http.Get("http://localhost:8000/stt")
 	// Hier zou je STT aanroepen (bijv. Whisper of Vosk)
-	fmt.Fprintln(stdin, filename)
-	out := ""
-	if scanner.Scan() {
-		out = scanner.Text()
-	}
-	log.Print(string(out))
+	log.Print("output:", resp)
+	text, _ := io.ReadAll(resp.Body)
 	// AI vertaling / verwerking
-	aiOutput := ai.Ai(string(out))
+	aiOutput := ai.Ai(string(text))
 	print(aiOutput)
 	sentences := splitIntoSentences(aiOutput)
 	fmt.Print(sentences)
@@ -190,16 +189,6 @@ var stdin io.WriteCloser
 var scanner *bufio.Scanner
 
 func main() {
-	cmd := exec.Command("C:\\Users\\0jrli\\AppData\\Local\\Programs\\Python\\Python312\\python.exe", "test.py")
-	stdin, _ = cmd.StdinPipe()
-	stdout, _ := cmd.StdoutPipe()
-	cmd.Stderr = os.Stderr
-	if err := cmd.Start(); err != nil {
-		log.Fatal(err)
-	}
-	scanner = bufio.NewScanner(stdout)
-	scanner.Scan()
-	fmt.Println(scanner.Text()) // READY
 
 	http.HandleFunc("/ws", wsHandler)
 	log.Println("Server gestart op :8080")
