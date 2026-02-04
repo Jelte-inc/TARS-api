@@ -1,21 +1,61 @@
+import asyncio
+import websockets
+import json
+import ollama
+from concurrent.futures import ThreadPoolExecutor
 
-from ai.ai_chat_model import ai
-from fastapi import FastAPI
-from pydantic import BaseModel
+# Settings
+PI_URI = "ws://10.80.178.250:8765"
+MODEL_NAME = "tars"
 
-app = FastAPI()
+# Executer fixes error where the script will freeze and cause websocket problems
+executor = ThreadPoolExecutor(max_workers=1)
 
-# Voorbeeld input-model
-class InputData(BaseModel):
-    name: str
-    number: int
+# Inject prompt into ollama model
+def call_ollama(prompt):
+    return ollama.chat(
+        model=MODEL_NAME,
+        messages=[{'role': 'user', 'content': prompt}],
+        format='json'
+    )
 
-# Root endpoint (GET)
-@app.get("/")
-def get(message: str):
-    return ai(message)
+async def run_controller():
+    print(f"Verbinden met TARS op {PI_URI}...")
+    
+    try:
+        # ping_interval=None fixes issues with timeouts
+        #TODO: check if this is an error in golang
+        async with websockets.connect(PI_URI, ping_interval=None) as websocket:
+            print("Connected! Tars is online.")
+            
+            loop = asyncio.get_running_loop()
+            
+            while True:
+                prompt = await loop.run_in_executor(None, input, "\nCommando for TARS: ")
+                
+                if prompt.lower() in ['exit', 'quit']:
+                    break
 
+                print("TARS is thinking...")
+                
+                # Call ollama without blocking the websocket
+                try:
+                    response = await loop.run_in_executor(executor, call_ollama, prompt)
+                    raw_json = response['message']['content']
+                    
+                    # Validate json and send through websocket
+                    valid_data = json.loads(raw_json)
+                    await websocket.send(json.dumps(valid_data))
+                    print(f"Send: {raw_json}")
+                    
+                except Exception as e:
+                    print(f"Error while running Ollama: {e}")
+
+    except Exception as e:
+        print(f"Connection closed: {e}")
 
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=56277) 
+    try:
+        asyncio.run(run_controller())
+    except KeyboardInterrupt:
+        print("\nClosed by user.")
