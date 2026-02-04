@@ -5,7 +5,8 @@ import ollama
 from concurrent.futures import ThreadPoolExecutor
 
 # Settings
-PI_URI = "ws://10.80.178.250:8765"
+# PI_URI = "ws://10.80.178.250:8765"
+PI_URI = "ws://192.168.2.43:8765"
 MODEL_NAME = "tars"
 
 # Executer fixes error where the script will freeze and cause websocket problems
