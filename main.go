@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -114,6 +115,37 @@ func splitIntoSentences(text string) []string {
 	return sentences
 }
 
+func addWavHeader(pcm []byte, sampleRate int, channels int, bitsPerSample int) []byte {
+	byteRate := sampleRate * channels * bitsPerSample / 8
+	blockAlign := channels * bitsPerSample / 8
+	dataLen := len(pcm)
+	riffLen := 36 + dataLen
+
+	buf := &bytes.Buffer{}
+
+	// RIFF header
+	buf.WriteString("RIFF")
+	binary.Write(buf, binary.LittleEndian, uint32(riffLen))
+	buf.WriteString("WAVE")
+
+	// fmt chunk
+	buf.WriteString("fmt ")
+	binary.Write(buf, binary.LittleEndian, uint32(16)) // PCM
+	binary.Write(buf, binary.LittleEndian, uint16(1))  // AudioFormat = PCM
+	binary.Write(buf, binary.LittleEndian, uint16(channels))
+	binary.Write(buf, binary.LittleEndian, uint32(sampleRate))
+	binary.Write(buf, binary.LittleEndian, uint32(byteRate))
+	binary.Write(buf, binary.LittleEndian, uint16(blockAlign))
+	binary.Write(buf, binary.LittleEndian, uint16(bitsPerSample))
+
+	// data chunk
+	buf.WriteString("data")
+	binary.Write(buf, binary.LittleEndian, uint32(dataLen))
+	buf.Write(pcm)
+
+	return buf.Bytes()
+}
+
 // Simpele mock STT + AI pipeline
 func processAudio(buffer *AudioBuffer, conn *websocket.Conn) {
 	if !buffer.IsDone() {
@@ -123,20 +155,34 @@ func processAudio(buffer *AudioBuffer, conn *websocket.Conn) {
 	audio := buffer.Get()
 
 	filename := "received_audio.wav"
-	err := os.WriteFile(filename, audio, 0644)
+	wav := addWavHeader(audio, 16000, 1, 16)
+	err := os.WriteFile("received_audio.wav", wav, 0644)
 	if err != nil {
 		log.Println("Fout bij opslaan bestand:", err)
 		return
 	}
 	log.Println("Audio opgeslagen als", filename)
 	resp, err := http.Get("http://localhost:8000/stt")
+	fmt.Printf("resp", resp)
 	// Hier zou je STT aanroepen (bijv. Whisper of Vosk)
-	log.Print("output:", resp)
 	text, _ := io.ReadAll(resp.Body)
+	type AiOutput struct {
+		Command string   `json:"command"`
+		Args    []string `json:"args"`
+		Speech  string   `json:"speech"`
+	}
+	var aiOutputObj = AiOutput{}
 	// AI vertaling / verwerking
 	aiOutput := ai.Ai(string(text))
-	print(aiOutput)
-	sentences := splitIntoSentences(aiOutput)
+	cleanJSON := strings.ReplaceAll(aiOutput, "```json", "")
+	cleanJSON = strings.ReplaceAll(cleanJSON, "```", "")
+	cleanJSON = strings.TrimSpace(cleanJSON)
+	err = json.Unmarshal([]byte(cleanJSON), &aiOutputObj)
+	if err := conn.WriteMessage(websocket.TextMessage, []byte(cleanJSON)); err != nil {
+		log.Println("WebSocket write error:", err)
+	}
+	fmt.Printf("AI-output:", aiOutputObj.Speech)
+	sentences := splitIntoSentences(aiOutputObj.Speech)
 	fmt.Print(sentences)
 	for _, s := range sentences {
 		sentence := map[string]string{

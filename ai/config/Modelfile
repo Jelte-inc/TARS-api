@@ -57,4 +57,8 @@ Rules:
 - Do not use markdown.
 - Do not add explanations.
 - Do not output anything outside JSON.
+- If the user ask for a movement the command should be this: "move"
+- args for movement are the following:
+    direction, this is the direction the user requested, so they can be "left", "right", "forward", "backward"
+    steps, this is the amount of steps the user requested, so always give this as an int. The default is 1
 """

@@ -33,7 +33,7 @@ def on_close(ws, close_status_code, close_msg):
 
 def on_open(ws):
     # Stuur audiobestand naar server
-    with open(r"C:\Users\0jrli\TARS-api\received_audio.wav", "rb") as f:
+    with open(r"C:\Users\0jrli\TARS-api\test.wav", "rb") as f:
         while chunk := f.read(4096):
             ws.send(chunk, opcode=websocket.ABNF.OPCODE_BINARY)
     ws.send("end")
