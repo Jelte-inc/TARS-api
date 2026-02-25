@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/binary"
 	"encoding/json"
@@ -62,7 +61,6 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer conn.Close()
-
 	buffer := &AudioBuffer{}
 
 	for {
@@ -82,7 +80,8 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 				buffer.SetDone()
 				log.Println("Full audio received, processing...")
 
-				go processAudio(buffer, conn)
+				processAudio(buffer, conn)
+				buffer = &AudioBuffer{}
 			}
 		}
 	}
@@ -210,29 +209,12 @@ func processAudio(buffer *AudioBuffer, conn *websocket.Conn) {
 		if err := conn.WriteMessage(websocket.BinaryMessage, audioData); err != nil {
 			log.Println("WebSocket write error:", err)
 		}
-
-		// Stuur einde van zin
-		if err := conn.WriteMessage(websocket.TextMessage, []byte("end")); err != nil {
-			log.Println("WebSocket write error:", err)
-		}
-
-		// Stuur een korte tekstmelding om einde van zin aan te geven
-		if err := conn.WriteMessage(websocket.TextMessage, []byte("end")); err != nil {
-			log.Println("WriteMessage error:", err)
-			break
-		}
 	}
-
+	// Stuur einde van zin
+	if err := conn.WriteMessage(websocket.TextMessage, []byte("end")); err != nil {
+		log.Println("WebSocket write error:", err)
+	}
 }
-
-// Mock AI functie
-func mockAI(transcript string) string {
-	// Verwerk transcriptie (hier dummy)
-	return fmt.Sprintf("AI output: %s", transcript)
-}
-
-var stdin io.WriteCloser
-var scanner *bufio.Scanner
 
 func main() {
 

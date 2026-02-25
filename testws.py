@@ -1,29 +1,21 @@
 import websocket
-import io
 import soundfile as sf
 import sounddevice as sd
-
-
-audio_buffer = bytearray()
+import io
 
 def on_message(ws, message):
-    global audio_buffer
     if isinstance(message, bytes):
-        audio_buffer.extend(message)
-    elif isinstance(message, str) and message.lower() == "end":
-        print("Length of audio_buffer:", len(audio_buffer))
-        if len(audio_buffer) == 0:
-            print("Geen audio ontvangen!")
-            return
-        with open("debug.wav", "wb") as f:
-            f.write(audio_buffer)
-        import soundfile as sf
-        import sounddevice as sd
-        data, samplerate = sf.read("debug.wav", dtype='float32')
-        sd.play(data, samplerate=samplerate, blocking=True)
-        print("Audio volledig afgespeeld")
-        audio_buffer = bytearray()  # reset voor volgende zin
+        print("Ontvangen audio blob:", len(message), "bytes")
 
+        # Lees WAV direct uit geheugen (niet eerst samenvoegen)
+        with io.BytesIO(message) as wav_buffer:
+            data, samplerate = sf.read(wav_buffer, dtype='float32')
+            sd.play(data, samplerate=samplerate, blocking=True)
+
+        print("Audio afgespeeld")
+
+    elif isinstance(message, str) and message.lower() == "end":
+        print("TTS volledig ontvangen\n")
 
 def on_error(ws, error):
     print("WebSocket error:", error)
@@ -36,6 +28,7 @@ def on_open(ws):
     with open(r"C:\Users\0jrli\TARS-api\test.wav", "rb") as f:
         while chunk := f.read(4096):
             ws.send(chunk, opcode=websocket.ABNF.OPCODE_BINARY)
+
     ws.send("end")
 
 ws = websocket.WebSocketApp(
